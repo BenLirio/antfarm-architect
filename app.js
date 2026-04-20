@@ -1,4 +1,6 @@
 // Antfarm Architect — pheromone-trail ant colony simulation
+// Reshaped for legibility: visible pheromone trails, ant-mode colors,
+// live behavior legend, and stronger / more satisfying food-drop interaction.
 
 // ──────────────────────────────────────────────
 //  Canvas setup
@@ -9,13 +11,16 @@ const CELL = 4; // px per cell
 
 let canvas, ctx;
 let grid = []; // cell states: 'rock'|'soil'|'tunnel'|'nest'|'food'|'air'
-let pheromones = []; // Float32Array[2] — [to-food, to-nest]
+let pheromones = []; // Float32Array[2] — [to-nest (carried food), to-food (scouting)]
 let ants = [];
 let foodSources = [];
 let stats = { tunnels: 0, food: 0 };
 let tickCount = 0;
 let animId;
 let tapHintHidden = false;
+let showPheromones = true; // toggle via legend button
+let lastFoodDrop = -999; // tick of most recent food drop (for visual ripple)
+let lastFoodPos = { x: 0, y: 0 };
 
 // Archetype verdicts — deterministic based on colony metrics
 const VERDICTS = [
@@ -45,6 +50,19 @@ const VERDICTS = [
     desc: (s) => `Clean tunnel network. Reliable food loops. ${s.foodCollected} food sources secured with surgical precision. Your colony is what the others aspire to be — and silently resent.`,
   },
 ];
+
+// Ant mode display config
+const MODE_COLORS = {
+  scout:  '#d49016', // amber — exploring, digging
+  toFood: '#50c8c8', // cyan — following pheromone trail to food
+  toNest: '#ffc84a', // bright amber — carrying food home
+};
+
+const MODE_LABELS = {
+  scout:  'DIGGING',
+  toFood: 'SEEKING FOOD',
+  toNest: 'RETURNING HOME',
+};
 
 // ──────────────────────────────────────────────
 //  Grid helpers
@@ -165,19 +183,18 @@ function stepAnt(ant, rng) {
   if (cell === 'soil' && ant.mode !== 'toNest') {
     grid[idx(ant.x, ant.y)] = 'tunnel';
     stats.tunnels++;
-    // Deposit to-nest pheromone while digging
     if (ant.carryFood) {
       pheromones[idx(ant.x, ant.y) * 2] = Math.min(255, pheromones[idx(ant.x, ant.y) * 2] + 40);
     }
   }
 
-  // Deposit pheromones
+  // Deposit pheromones — stronger values so trails are visible
   if (inBounds(ant.x, ant.y)) {
     const pi = idx(ant.x, ant.y) * 2;
-    if (ant.carryFood) {
-      pheromones[pi] = Math.min(255, pheromones[pi] + 20); // to-nest
+    if (ant.mode === 'toNest') {
+      pheromones[pi] = Math.min(255, pheromones[pi] + 35);     // to-nest (amber)
     } else {
-      pheromones[pi + 1] = Math.min(255, pheromones[pi + 1] + 12); // to-food
+      pheromones[pi + 1] = Math.min(255, pheromones[pi + 1] + 22); // to-food (cyan)
     }
   }
 
@@ -194,31 +211,29 @@ function stepAnt(ant, rng) {
     const np = idx(nx, ny) * 2;
 
     if (ant.mode === 'toNest') {
-      weight += pheromones[np] * 0.08;        // follow to-nest trail
+      weight += pheromones[np] * 0.1;
       if (ncell === 'nest') weight += 500;
       if (ncell === 'tunnel') weight += 3;
-      // Gravity toward nest top
       if (ny < ant.y) weight += 4;
     } else if (ant.mode === 'toFood') {
-      weight += pheromones[np + 1] * 0.06;   // follow to-food trail
+      weight += pheromones[np + 1] * 0.08;
       if (ncell === 'food') weight += 500;
       if (ncell === 'tunnel') weight += 2;
     } else {
       // Scout: prefer pheromones lightly, downward gravity to explore
       weight += pheromones[np + 1] * 0.02;
       if (ncell === 'tunnel') weight += 1.5;
-      if (ny > ant.y) weight += 2; // go down mostly
+      if (ny > ant.y) weight += 2;
       if (ncell === 'food') weight += 80;
     }
 
-    // Momentum: prefer current direction
+    // Momentum
     if (ddx === ant.dx && ddy === ant.dy) weight *= 2.5;
 
     candidates.push({ nx, ny, ddx, ddy, weight });
   }
 
   if (candidates.length === 0) {
-    // Stuck — flip direction
     ant.dx = -ant.dx; ant.dy = -ant.dy;
     return;
   }
@@ -235,11 +250,10 @@ function stepAnt(ant, rng) {
     }
   }
 
-  // Occasionally switch to food-seeking mode
+  // Mode transitions
   if (ant.mode === 'scout' && ant.scoutTimer > 40 && rng() < 0.02) {
     ant.mode = 'toFood';
   }
-  // Wandering ants re-scout sometimes
   if (ant.mode === 'toFood' && ant.scoutTimer > 120 && rng() < 0.015) {
     ant.mode = 'scout';
     ant.scoutTimer = 0;
@@ -251,7 +265,7 @@ function stepAnt(ant, rng) {
 // ──────────────────────────────────────────────
 function decayPheromones() {
   for (let i = 0; i < pheromones.length; i++) {
-    if (pheromones[i] > 0) pheromones[i] = Math.max(0, pheromones[i] - 0.18);
+    if (pheromones[i] > 0) pheromones[i] = Math.max(0, pheromones[i] - 0.22);
   }
 }
 
@@ -277,21 +291,38 @@ function render() {
       ctx.fillStyle = COLORS[cell] || '#000';
       ctx.fillRect(x * CELL, y * CELL, CELL, CELL);
 
-      // Draw pheromone overlay on tunnel/nest cells
-      if (cell === 'tunnel' || cell === 'nest') {
+      // Draw pheromone overlay — much stronger alpha so trails are clearly visible
+      if (showPheromones && (cell === 'tunnel' || cell === 'nest' || cell === 'soil')) {
         const pi = idx(x, y) * 2;
-        const tf = pheromones[pi];
-        const tt = pheromones[pi + 1];
-        if (tf > 4) {
-          ctx.fillStyle = `rgba(232,160,32,${Math.min(tf / 255, 0.4)})`;
+        const toNest = pheromones[pi];      // amber trail — ants carrying food home
+        const toFood = pheromones[pi + 1];  // cyan trail — ants seeking food
+
+        if (toNest > 3) {
+          // Amber = "food was here, follow me home"
+          ctx.fillStyle = `rgba(255,180,40,${Math.min(toNest / 180, 0.75)})`;
           ctx.fillRect(x * CELL, y * CELL, CELL, CELL);
         }
-        if (tt > 4) {
-          ctx.fillStyle = `rgba(80,200,80,${Math.min(tt / 255, 0.25)})`;
+        if (toFood > 3) {
+          // Cyan = "nest is here, come this way"
+          ctx.fillStyle = `rgba(80,200,200,${Math.min(toFood / 200, 0.5)})`;
           ctx.fillRect(x * CELL, y * CELL, CELL, CELL);
         }
       }
     }
+  }
+
+  // Food drop ripple effect
+  const rippleAge = tickCount - lastFoodDrop;
+  if (rippleAge < 30) {
+    const alpha = 1 - rippleAge / 30;
+    const r = (rippleAge / 30) * CELL * 14;
+    const px = lastFoodPos.x * CELL + CELL / 2;
+    const py = lastFoodPos.y * CELL + CELL / 2;
+    ctx.beginPath();
+    ctx.arc(px, py, r, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(255,200,60,${alpha * 0.6})`;
+    ctx.lineWidth = 2;
+    ctx.stroke();
   }
 
   // Draw food sources (pulsing)
@@ -301,7 +332,7 @@ function render() {
     const py = f.y * CELL + CELL / 2;
     const r = CELL * (1.8 + pulse * 0.8);
     const grad = ctx.createRadialGradient(px, py, 0, px, py, r);
-    grad.addColorStop(0, 'rgba(255,210,80,0.9)');
+    grad.addColorStop(0, 'rgba(255,210,80,0.95)');
     grad.addColorStop(1, 'rgba(232,160,32,0)');
     ctx.beginPath();
     ctx.arc(px, py, r, 0, Math.PI * 2);
@@ -309,13 +340,13 @@ function render() {
     ctx.fill();
   }
 
-  // Draw ants
+  // Draw ants — color-coded by mode so you can read the colony state at a glance
   for (const ant of ants) {
     const px = ant.x * CELL + CELL / 2;
     const py = ant.y * CELL + CELL / 2;
-    ctx.fillStyle = ant.carryFood ? '#ffc84a' : '#d49016';
+    ctx.fillStyle = MODE_COLORS[ant.mode] || '#d49016';
     ctx.beginPath();
-    ctx.arc(px, py, ant.carryFood ? 2.2 : 1.6, 0, Math.PI * 2);
+    ctx.arc(px, py, ant.mode === 'toNest' ? 2.2 : 1.6, 0, Math.PI * 2);
     ctx.fill();
   }
 }
@@ -343,8 +374,9 @@ function tick() {
     }
   }
 
-  // Update stats display
+  // Update stats display and live legend
   updateStats();
+  updateLegend();
   render();
   animId = requestAnimationFrame(tick);
 }
@@ -354,6 +386,18 @@ function updateStats() {
   document.getElementById('stat-ants').textContent = `ANTS: ${ants.length}`;
   document.getElementById('stat-tunnels').textContent = `TUNNELS: ${tunnelCount}`;
   document.getElementById('stat-food').textContent = `FOOD SECURED: ${stats.food}`;
+}
+
+function updateLegend() {
+  // Count ants by mode and display live in the legend
+  const counts = { scout: 0, toFood: 0, toNest: 0 };
+  for (const ant of ants) counts[ant.mode]++;
+  const legendScout  = document.getElementById('legend-scout-count');
+  const legendFood   = document.getElementById('legend-food-count');
+  const legendNest   = document.getElementById('legend-nest-count');
+  if (legendScout)  legendScout.textContent  = counts.scout;
+  if (legendFood)   legendFood.textContent   = counts.toFood;
+  if (legendNest)   legendNest.textContent   = counts.toNest;
 }
 
 // ──────────────────────────────────────────────
@@ -382,16 +426,62 @@ function canvasClick(e) {
     }
   }
 
-  // Switch ants to food-seeking
+  // Blast a burst of to-food pheromone outward from the drop point so ants
+  // pick up the signal quickly — this makes food placement feel impactful
+  const blastRadius = 12;
+  for (let dy = -blastRadius; dy <= blastRadius; dy++) {
+    for (let dx = -blastRadius; dx <= blastRadius; dx++) {
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist > blastRadius) continue;
+      const fx = gx + dx, fy = gy + dy;
+      if (!inBounds(fx, fy)) continue;
+      const strength = 120 * (1 - dist / blastRadius);
+      pheromones[idx(fx, fy) * 2 + 1] = Math.min(255, pheromones[idx(fx, fy) * 2 + 1] + strength);
+    }
+  }
+
+  // Switch ALL ants to food-seeking mode immediately — user action should be decisive
   for (const ant of ants) {
-    if (Math.random() < 0.6) ant.mode = 'toFood';
+    ant.mode = 'toFood';
     ant.scoutTimer = 0;
   }
+
+  // Ripple effect
+  lastFoodDrop = tickCount;
+  lastFoodPos = { x: gx, y: gy };
+
+  // Show a brief status message
+  showAction('FOOD DROPPED — COLONY REDIRECTED');
 
   // Hide tap hint
   if (!tapHintHidden) {
     tapHintHidden = true;
     document.getElementById('tap-hint').classList.add('hidden');
+  }
+}
+
+// ──────────────────────────────────────────────
+//  Action flash message
+// ──────────────────────────────────────────────
+let actionTimer = null;
+function showAction(msg) {
+  const el = document.getElementById('action-msg');
+  if (!el) return;
+  el.textContent = msg;
+  el.classList.add('visible');
+  clearTimeout(actionTimer);
+  actionTimer = setTimeout(() => el.classList.remove('visible'), 2000);
+}
+
+// ──────────────────────────────────────────────
+//  Toggle pheromone overlay
+// ──────────────────────────────────────────────
+function togglePheromones() {
+  showPheromones = !showPheromones;
+  const btn = document.getElementById('btn-pheromones');
+  if (btn) {
+    btn.textContent = showPheromones ? 'PHEROMONES: ON' : 'PHEROMONES: OFF';
+    btn.classList.toggle('dim', !showPheromones);
   }
 }
 
@@ -424,7 +514,7 @@ function takeSnapshot() {
       return ha - hb;
     });
 
-    let verdict = VERDICTS[VERDICTS.length - 1]; // fallback
+    let verdict = VERDICTS[VERDICTS.length - 1];
     for (const v of shuffled) {
       if (v.test(snapStats)) { verdict = v; break; }
     }
@@ -449,6 +539,7 @@ function resetColony() {
   initGrid();
   initAnts();
   tapHintHidden = false;
+  lastFoodDrop = -999;
   document.getElementById('tap-hint').classList.remove('hidden');
   closeReveal();
   animId = requestAnimationFrame(tick);

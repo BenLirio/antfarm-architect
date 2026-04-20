@@ -6,6 +6,8 @@
   --amber: #e8a020;
   --amber-dim: #7a4f08;
   --amber-bright: #ffc84a;
+  --cyan: #50c8c8;
+  --cyan-dim: #1a5050;
   --soil-dark: #100c08;
   --soil-mid: #1a1208;
   --panel-bg: rgba(12, 8, 2, 0.96);
@@ -105,9 +107,106 @@ h1 {
   opacity: 0;
 }
 
+/* Action flash message */
+#action-msg {
+  position: absolute;
+  top: 8px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--amber-bright);
+  text-shadow: 0 0 8px var(--amber);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+#action-msg.visible {
+  opacity: 1;
+}
+
+/* Live legend */
+#legend {
+  width: 100%;
+  max-width: 480px;
+  border: 1px solid var(--amber-dim);
+  padding: 10px 14px;
+  background: rgba(20, 12, 2, 0.7);
+  font-size: 11px;
+}
+
+.legend-title {
+  font-size: 10px;
+  color: var(--text-dim);
+  letter-spacing: 0.18em;
+  margin-bottom: 8px;
+}
+
+.legend-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 5px;
+}
+
+.legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.legend-label {
+  color: var(--amber);
+  letter-spacing: 0.08em;
+  min-width: 120px;
+  font-size: 10px;
+}
+
+.legend-count {
+  color: var(--amber-bright);
+  min-width: 24px;
+  text-align: right;
+  font-size: 11px;
+}
+
+.legend-note {
+  color: var(--text-dim);
+  font-size: 10px;
+  letter-spacing: 0.03em;
+}
+
+.legend-trail-row {
+  margin-top: 3px;
+}
+
+.legend-trail {
+  width: 28px;
+  height: 6px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.amber-trail {
+  background: rgba(255, 180, 40, 0.7);
+  box-shadow: 0 0 6px rgba(255, 180, 40, 0.5);
+}
+
+.cyan-trail {
+  background: rgba(80, 200, 200, 0.6);
+  box-shadow: 0 0 6px rgba(80, 200, 200, 0.4);
+}
+
+.trail-note {
+  color: var(--text-dim);
+  font-size: 10px;
+}
+
 #controls {
   display: flex;
-  gap: 10px;
+  gap: 8px;
   flex-wrap: wrap;
   justify-content: center;
   width: 100%;
@@ -116,12 +215,12 @@ h1 {
 
 button {
   font-family: 'Share Tech Mono', monospace;
-  font-size: 12px;
+  font-size: 11px;
   letter-spacing: 0.1em;
   background: transparent;
   color: var(--amber);
   border: 2px solid var(--amber-dim);
-  padding: 12px 18px;
+  padding: 10px 14px;
   min-height: 44px;
   cursor: pointer;
   transition: background 0.15s, color 0.15s, border-color 0.15s, box-shadow 0.15s;
@@ -136,15 +235,34 @@ button:hover, button:focus {
   outline: none;
 }
 
+button.dim {
+  color: var(--text-dim);
+  border-color: var(--text-dim);
+}
+
 #btn-snapshot {
-  flex: 1;
+  flex: 2;
   min-width: 200px;
   border-color: var(--amber);
   color: var(--amber-bright);
   text-shadow: 0 0 8px var(--amber);
 }
 
+#btn-pheromones {
+  flex: 1;
+  min-width: 130px;
+  border-color: var(--cyan-dim);
+  color: var(--cyan);
+}
+
+#btn-pheromones:hover, #btn-pheromones:focus {
+  border-color: var(--cyan);
+  box-shadow: 0 0 10px var(--cyan-dim);
+}
+
 #btn-reset {
+  flex: 0;
+  min-width: 80px;
   border-color: var(--text-dim);
   color: var(--text-dim);
 }
@@ -158,6 +276,70 @@ button:hover, button:focus {
   color: var(--text-dim);
   letter-spacing: 0.06em;
   padding: 0 4px;
+}
+
+/* How it works expandable */
+#how-it-works {
+  width: 100%;
+  max-width: 480px;
+  border: 1px solid var(--amber-dim);
+  background: rgba(20, 12, 2, 0.7);
+  font-size: 11px;
+}
+
+#how-it-works summary {
+  cursor: pointer;
+  padding: 10px 14px;
+  letter-spacing: 0.14em;
+  color: var(--amber-dim);
+  list-style: none;
+  user-select: none;
+}
+
+#how-it-works summary::-webkit-details-marker { display: none; }
+
+#how-it-works summary::before {
+  content: '▶ ';
+  font-size: 9px;
+}
+
+#how-it-works[open] summary::before {
+  content: '▼ ';
+}
+
+#how-it-works summary:hover {
+  color: var(--amber);
+}
+
+.how-body {
+  padding: 0 16px 14px;
+  color: var(--text-dim);
+  line-height: 1.8;
+  letter-spacing: 0.03em;
+}
+
+.how-body p {
+  margin-bottom: 10px;
+  font-size: 11px;
+}
+
+.how-body ul {
+  padding-left: 16px;
+  margin-bottom: 10px;
+}
+
+.how-body li {
+  margin-bottom: 8px;
+  font-size: 11px;
+}
+
+.how-body strong {
+  color: var(--amber);
+}
+
+.how-body em {
+  color: var(--cyan);
+  font-style: normal;
 }
 
 /* Reveal panel */
