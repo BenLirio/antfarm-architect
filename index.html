@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Antfarm Architect</title>
+  <meta property="og:title" content="Antfarm Architect">
+  <meta property="og:description" content="Watch your ant colony excavate an underground world. Drop food to redirect the swarm — then reveal your colony's true personality.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <script src="app.js" defer></script>
+  <script src="feedback.js" defer></script>
+</head>
+<body>
+  <div id="app">
+    <header>
+      <h1>ANTFARM ARCHITECT</h1>
+      <p id="subtitle">tap the soil to drop food &mdash; watch the colony decide</p>
+    </header>
+
+    <div id="canvas-wrap">
+      <canvas id="antfarm"></canvas>
+      <div id="tap-hint">tap anywhere on the colony to drop a food source</div>
+    </div>
+
+    <div id="controls">
+      <button id="btn-snapshot" onclick="takeSnapshot()">SNAPSHOT &#9654; REVEAL COLONY TYPE</button>
+      <button id="btn-reset" onclick="resetColony()">RESET</button>
+    </div>
+
+    <div id="stats-bar">
+      <span id="stat-ants"></span>
+      <span id="stat-tunnels"></span>
+      <span id="stat-food"></span>
+    </div>
+
+    <div id="reveal-panel" style="display:none">
+      <div id="reveal-inner">
+        <div id="reveal-computing">analysing pheromone residue&hellip;</div>
+        <div id="reveal-result" style="display:none">
+          <div id="verdict-label">YOUR COLONY IS</div>
+          <div id="verdict-name"></div>
+          <div id="verdict-desc"></div>
+          <div id="share" style="display:none">
+            <button onclick="share()">SHARE YOUR COLONY &#9654;</button>
+          </div>
+        </div>
+      </div>
+      <button id="btn-close" onclick="closeReveal()">&#10005; CLOSE</button>
+    </div>
+  </div>
+</body>
+</html>
