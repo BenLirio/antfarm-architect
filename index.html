@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Antfarm Architect</title>
   <meta property="og:title" content="Antfarm Architect">
-  <meta property="og:description" content="Watch your ant colony excavate an underground world. Drop food to redirect the swarm — then reveal your colony's true personality.">
+  <meta property="og:description" content="Name your colony, choose its personality, and watch your ants dig their underground world — then reveal what kind of colony you built.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://benlirio.com/antfarm-architect/">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -16,89 +16,144 @@
 </head>
 <body>
   <div id="app">
-    <header>
-      <h1>ANTFARM ARCHITECT</h1>
-      <p id="subtitle">tap the soil to drop food &mdash; the colony will respond</p>
-    </header>
 
-    <div id="canvas-wrap">
-      <canvas id="antfarm"></canvas>
-      <div id="tap-hint">tap anywhere on the colony to drop a food source</div>
-      <div id="action-msg"></div>
-    </div>
+    <!-- ── Colony Creation Screen ── -->
+    <div id="creation-screen">
+      <header>
+        <h1>ANTFARM ARCHITECT</h1>
+        <p id="creation-subtitle">design your colony before they dig</p>
+      </header>
 
-    <!-- Live legend: explains ant colors and pheromone trails in real time -->
-    <div id="legend">
-      <div class="legend-title">WHAT YOU'RE SEEING</div>
-      <div class="legend-row">
-        <span class="legend-dot" style="background:#d49016"></span>
-        <span class="legend-label">DIGGING</span>
-        <span class="legend-count" id="legend-scout-count">0</span>
-        <span class="legend-note">scouts excavate tunnels &amp; explore</span>
-      </div>
-      <div class="legend-row">
-        <span class="legend-dot" style="background:#50c8c8"></span>
-        <span class="legend-label">SEEKING FOOD</span>
-        <span class="legend-count" id="legend-food-count">0</span>
-        <span class="legend-note">following cyan pheromone trails</span>
-      </div>
-      <div class="legend-row">
-        <span class="legend-dot" style="background:#ffc84a"></span>
-        <span class="legend-label">RETURNING HOME</span>
-        <span class="legend-count" id="legend-nest-count">0</span>
-        <span class="legend-note">carrying food, laying amber trail</span>
-      </div>
-      <div class="legend-row legend-trail-row">
-        <span class="legend-trail amber-trail"></span>
-        <span class="legend-note trail-note">amber glow = "food found here" trail</span>
-      </div>
-      <div class="legend-row legend-trail-row">
-        <span class="legend-trail cyan-trail"></span>
-        <span class="legend-note trail-note">cyan glow = "nest is this way" trail</span>
-      </div>
-    </div>
+      <div id="creation-form">
+        <div class="form-group">
+          <label for="colony-name-input">COLONY NAME</label>
+          <input
+            id="colony-name-input"
+            type="text"
+            maxlength="28"
+            placeholder="e.g. THE DEEP ONES"
+            autocomplete="off"
+            spellcheck="false"
+          />
+        </div>
 
-    <div id="controls">
-      <button id="btn-snapshot" onclick="takeSnapshot()">SNAPSHOT &#9654; REVEAL COLONY TYPE</button>
-      <button id="btn-pheromones" onclick="togglePheromones()">PHEROMONES: ON</button>
-      <button id="btn-reset" onclick="resetColony()">RESET</button>
-    </div>
-
-    <div id="stats-bar">
-      <span id="stat-ants"></span>
-      <span id="stat-tunnels"></span>
-      <span id="stat-food"></span>
-    </div>
-
-    <!-- How it works panel -->
-    <details id="how-it-works">
-      <summary>HOW IT WORKS</summary>
-      <div class="how-body">
-        <p>Each ant follows simple rules — no central plan, no supervisor.</p>
-        <ul>
-          <li><strong>Scouts</strong> wander downward, digging through soil. When they've been out long enough they switch to food-seeking mode.</li>
-          <li><strong>Food-seekers</strong> follow the cyan pheromone trail you see on the ground — a chemical gradient laid by ants returning from the nest.</li>
-          <li>When a food-seeker finds food, it switches to <strong>returning home</strong> and lays an amber pheromone trail back to the nest. The stronger the trail, the more ants follow it — this is called <em>stigmergy</em>.</li>
-          <li>Pheromones evaporate over time. If you stop dropping food in one spot, the trail fades and the colony naturally disperses.</li>
-        </ul>
-        <p><strong>Your control:</strong> tapping drops food AND immediately floods the area with pheromone signal, so the entire colony pivots toward your target at once. You're not just placing bait — you're rewriting the gradient the whole swarm reads from.</p>
-      </div>
-    </details>
-
-    <div id="reveal-panel" style="display:none">
-      <div id="reveal-inner">
-        <div id="reveal-computing">analysing pheromone residue&hellip;</div>
-        <div id="reveal-result" style="display:none">
-          <div id="verdict-label">YOUR COLONY IS</div>
-          <div id="verdict-name"></div>
-          <div id="verdict-desc"></div>
-          <div id="share" style="display:none">
-            <button onclick="share()">SHARE YOUR COLONY &#9654;</button>
+        <div class="form-group">
+          <label>COLONY PERSONALITY</label>
+          <div id="trait-grid">
+            <button class="trait-btn" data-trait="hoarders" onclick="selectTrait(this)">
+              <span class="trait-icon">&#9679;&#9679;&#9679;</span>
+              <span class="trait-name">HOARDERS</span>
+              <span class="trait-desc">pack every tunnel with food before moving on</span>
+            </button>
+            <button class="trait-btn" data-trait="excavators" onclick="selectTrait(this)">
+              <span class="trait-icon">&#9660;&#9660;&#9660;</span>
+              <span class="trait-name">EXCAVATORS</span>
+              <span class="trait-desc">dig first, think later — the tunnel IS the goal</span>
+            </button>
+            <button class="trait-btn" data-trait="scouts" onclick="selectTrait(this)">
+              <span class="trait-icon">&#9658;&#9658;&#9658;</span>
+              <span class="trait-name">EXPLORERS</span>
+              <span class="trait-desc">always ranging ahead, rarely coming home</span>
+            </button>
+            <button class="trait-btn" data-trait="engineers" onclick="selectTrait(this)">
+              <span class="trait-icon">&#9632;&#9632;&#9632;</span>
+              <span class="trait-name">ENGINEERS</span>
+              <span class="trait-desc">methodical, efficient, suspicious of chaos</span>
+            </button>
           </div>
         </div>
+
+        <button id="btn-launch" onclick="launchColony()" disabled>FOUND YOUR COLONY &#9654;</button>
       </div>
-      <button id="btn-close" onclick="closeReveal()">&#10005; CLOSE</button>
     </div>
+
+    <!-- ── Simulation Screen (hidden until launch) ── -->
+    <div id="sim-screen" style="display:none">
+      <header>
+        <h1 id="colony-title">ANTFARM ARCHITECT</h1>
+        <p id="subtitle"></p>
+      </header>
+
+      <div id="canvas-wrap">
+        <canvas id="antfarm"></canvas>
+        <div id="tap-hint">tap anywhere on the colony to drop a food source</div>
+        <div id="action-msg"></div>
+      </div>
+
+      <!-- Live legend -->
+      <div id="legend">
+        <div class="legend-title">WHAT YOU'RE SEEING</div>
+        <div class="legend-row">
+          <span class="legend-dot" style="background:#d49016"></span>
+          <span class="legend-label">DIGGING</span>
+          <span class="legend-count" id="legend-scout-count">0</span>
+          <span class="legend-note">scouts excavate tunnels &amp; explore</span>
+        </div>
+        <div class="legend-row">
+          <span class="legend-dot" style="background:#50c8c8"></span>
+          <span class="legend-label">SEEKING FOOD</span>
+          <span class="legend-count" id="legend-food-count">0</span>
+          <span class="legend-note">following cyan pheromone trails</span>
+        </div>
+        <div class="legend-row">
+          <span class="legend-dot" style="background:#ffc84a"></span>
+          <span class="legend-label">RETURNING HOME</span>
+          <span class="legend-count" id="legend-nest-count">0</span>
+          <span class="legend-note">carrying food, laying amber trail</span>
+        </div>
+        <div class="legend-row legend-trail-row">
+          <span class="legend-trail amber-trail"></span>
+          <span class="legend-note trail-note">amber glow = "food found here" trail</span>
+        </div>
+        <div class="legend-row legend-trail-row">
+          <span class="legend-trail cyan-trail"></span>
+          <span class="legend-note trail-note">cyan glow = "nest is this way" trail</span>
+        </div>
+      </div>
+
+      <div id="controls">
+        <button id="btn-snapshot" onclick="takeSnapshot()">SNAPSHOT &#9654; REVEAL COLONY TYPE</button>
+        <button id="btn-pheromones" onclick="togglePheromones()">PHEROMONES: ON</button>
+        <button id="btn-redesign" onclick="redesignColony()">REDESIGN</button>
+      </div>
+
+      <div id="stats-bar">
+        <span id="stat-ants"></span>
+        <span id="stat-tunnels"></span>
+        <span id="stat-food"></span>
+      </div>
+
+      <!-- How it works panel -->
+      <details id="how-it-works">
+        <summary>HOW IT WORKS</summary>
+        <div class="how-body">
+          <p>Each ant follows simple rules — no central plan, no supervisor.</p>
+          <ul>
+            <li><strong>Scouts</strong> wander downward, digging through soil. Your colony's personality shapes how long they scout before switching modes.</li>
+            <li><strong>Food-seekers</strong> follow the cyan pheromone trail — a chemical gradient laid by ants returning from the nest.</li>
+            <li>When a food-seeker finds food, it switches to <strong>returning home</strong> and lays an amber pheromone trail. The stronger the trail, the more ants follow it — this is <em>stigmergy</em>.</li>
+            <li>Pheromones evaporate over time. If you stop dropping food in one spot, the trail fades and the colony naturally disperses.</li>
+          </ul>
+          <p><strong>Your control:</strong> tapping drops food AND immediately floods the area with pheromone signal, so the entire colony pivots toward your target at once. You're not just placing bait — you're rewriting the gradient the whole swarm reads from.</p>
+        </div>
+      </details>
+
+      <div id="reveal-panel" style="display:none">
+        <div id="reveal-inner">
+          <div id="reveal-computing">analysing pheromone residue&hellip;</div>
+          <div id="reveal-result" style="display:none">
+            <div id="verdict-label">YOUR COLONY IS</div>
+            <div id="verdict-name"></div>
+            <div id="verdict-desc"></div>
+            <div id="share" style="display:none">
+              <button onclick="share()">SHARE YOUR COLONY &#9654;</button>
+            </div>
+          </div>
+        </div>
+        <button id="btn-close" onclick="closeReveal()">&#10005; CLOSE</button>
+      </div>
+    </div>
+
   </div>
 </body>
 </html>

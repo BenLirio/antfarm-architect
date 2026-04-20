@@ -52,7 +52,170 @@ body::before {
   align-items: center;
   min-height: 100vh;
   padding: 12px 8px 32px;
+}
+
+/* ── Creation screen ── */
+#creation-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  gap: 24px;
+  padding-top: 8px;
+}
+
+#creation-subtitle {
+  font-size: 11px;
+  color: var(--amber-dim);
+  letter-spacing: 0.08em;
+  margin-top: 4px;
+}
+
+#creation-form {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  width: 100%;
+  max-width: 480px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
   gap: 10px;
+}
+
+.form-group label {
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  color: var(--text-dim);
+}
+
+#colony-name-input {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 18px;
+  letter-spacing: 0.12em;
+  background: transparent;
+  color: var(--amber-bright);
+  border: 2px solid var(--amber-dim);
+  padding: 12px 14px;
+  width: 100%;
+  text-transform: uppercase;
+  outline: none;
+  caret-color: var(--amber);
+}
+
+#colony-name-input::placeholder {
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+#colony-name-input:focus {
+  border-color: var(--amber);
+  box-shadow: 0 0 10px var(--amber-dim);
+}
+
+/* Trait grid */
+#trait-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.trait-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 14px 12px;
+  background: transparent;
+  border: 2px solid var(--amber-dim);
+  color: var(--text-dim);
+  font-family: 'Share Tech Mono', monospace;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s, background 0.15s, color 0.15s, box-shadow 0.15s;
+  min-height: 100px;
+}
+
+.trait-btn:hover, .trait-btn:focus {
+  border-color: var(--amber);
+  background: rgba(232, 160, 32, 0.06);
+  color: var(--amber);
+  outline: none;
+}
+
+.trait-btn.selected {
+  border-color: var(--amber-bright);
+  background: rgba(255, 200, 74, 0.1);
+  color: var(--amber-bright);
+  box-shadow: 0 0 12px var(--amber-dim);
+}
+
+.trait-icon {
+  font-size: 14px;
+  color: var(--amber-dim);
+  letter-spacing: -2px;
+}
+
+.trait-btn.selected .trait-icon {
+  color: var(--amber-bright);
+}
+
+.trait-name {
+  font-size: 12px;
+  letter-spacing: 0.12em;
+}
+
+.trait-desc {
+  font-size: 9px;
+  letter-spacing: 0.04em;
+  line-height: 1.5;
+  color: var(--text-dim);
+}
+
+.trait-btn.selected .trait-desc {
+  color: var(--amber-dim);
+}
+
+#btn-launch {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 13px;
+  letter-spacing: 0.14em;
+  background: transparent;
+  color: var(--amber-bright);
+  border: 2px solid var(--amber);
+  padding: 16px 24px;
+  cursor: pointer;
+  text-transform: uppercase;
+  text-shadow: 0 0 8px var(--amber);
+  box-shadow: 0 0 16px var(--amber-dim);
+  transition: background 0.15s, box-shadow 0.15s;
+  width: 100%;
+}
+
+#btn-launch:hover:not([disabled]) {
+  background: var(--amber-dim);
+  box-shadow: 0 0 24px var(--amber);
+}
+
+#btn-launch[disabled] {
+  opacity: 0.35;
+  cursor: not-allowed;
+  border-color: var(--amber-dim);
+  color: var(--amber-dim);
+  text-shadow: none;
+  box-shadow: none;
+}
+
+/* ── Sim screen ── */
+#sim-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  gap: 10px;
+  padding-top: 8px;
 }
 
 header {
@@ -260,9 +423,9 @@ button.dim {
   box-shadow: 0 0 10px var(--cyan-dim);
 }
 
-#btn-reset {
+#btn-redesign {
   flex: 0;
-  min-width: 80px;
+  min-width: 90px;
   border-color: var(--text-dim);
   color: var(--text-dim);
 }

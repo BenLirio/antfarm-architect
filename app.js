@@ -1,6 +1,20 @@
 // Antfarm Architect — pheromone-trail ant colony simulation
-// Reshaped for legibility: visible pheromone trails, ant-mode colors,
-// live behavior legend, and stronger / more satisfying food-drop interaction.
+// Reshaped: colony creation screen lets players name + choose personality
+// before watching their own colony dig.
+
+// ──────────────────────────────────────────────
+//  Colony identity (set during creation)
+// ──────────────────────────────────────────────
+let colonyName = '';
+let colonyTrait = ''; // 'hoarders' | 'excavators' | 'scouts' | 'engineers'
+
+// Trait-driven simulation parameters
+const TRAIT_PARAMS = {
+  hoarders:   { scoutSwitchTimer: 30,  scoutSwitchChance: 0.015, foodSwitchTimer: 80,  foodSwitchChance: 0.005, digBias: 1.0, pheroDecay: 0.18 },
+  excavators: { scoutSwitchTimer: 80,  scoutSwitchChance: 0.008, foodSwitchTimer: 200, foodSwitchChance: 0.01,  digBias: 2.2, pheroDecay: 0.25 },
+  scouts:     { scoutSwitchTimer: 20,  scoutSwitchChance: 0.04,  foodSwitchTimer: 60,  foodSwitchChance: 0.03,  digBias: 0.8, pheroDecay: 0.28 },
+  engineers:  { scoutSwitchTimer: 50,  scoutSwitchChance: 0.02,  foodSwitchTimer: 100, foodSwitchChance: 0.008, digBias: 1.0, pheroDecay: 0.20 },
+};
 
 // ──────────────────────────────────────────────
 //  Canvas setup
@@ -18,51 +32,110 @@ let stats = { tunnels: 0, food: 0 };
 let tickCount = 0;
 let animId;
 let tapHintHidden = false;
-let showPheromones = true; // toggle via legend button
-let lastFoodDrop = -999; // tick of most recent food drop (for visual ripple)
+let showPheromones = true;
+let lastFoodDrop = -999;
 let lastFoodPos = { x: 0, y: 0 };
 
-// Archetype verdicts — deterministic based on colony metrics
+// Archetype verdicts — aware of colony name and trait
 const VERDICTS = [
   {
     name: 'The Paranoid Hoarders',
     test: (s) => s.foodRatio > 0.55,
-    desc: (s) => `Your colony collected ${s.foodCollected} food caches while excavating only the tunnels absolutely necessary. They trust nothing, stockpile everything, and have definitely built a secret chamber you haven't found yet.`,
+    desc: (s, name) => `${name} collected ${s.foodCollected} food caches while excavating only the tunnels absolutely necessary. They trust nothing, stockpile everything, and have definitely built a secret chamber you haven't found yet.`,
   },
   {
     name: 'The Tunnel Maximalists',
     test: (s) => s.tunnelRatio > 0.45,
-    desc: (s) => `${s.tunnelCount} tunnels and counting. Your colony doesn't need a destination — the digging IS the destination. Structural integrity is someone else's problem.`,
+    desc: (s, name) => `${s.tunnelCount} tunnels and counting. ${name} doesn't need a destination — the digging IS the destination. Structural integrity is someone else's problem.`,
   },
   {
     name: 'The Chaotic Scouts',
     test: (s) => s.scoutRatio > 0.5,
-    desc: (s) => `${s.scoutCount} ants were spotted wandering off-pheromone at the moment of the snapshot. They claim they're "exploring alternative routes." No one believes them.`,
+    desc: (s, name) => `${s.scoutCount} ants in ${name} were spotted wandering off-pheromone at the moment of the snapshot. They claim they're "exploring alternative routes." No one believes them.`,
   },
   {
     name: 'The Reluctant Architects',
     test: (s) => s.tunnelRatio < 0.12 && s.foodRatio < 0.3,
-    desc: (_s) => `Your colony spent most of its time standing very still, looking thoughtful. They have strong opinions about tunnel placement but have yet to commit to any of them.`,
+    desc: (_s, name) => `${name} spent most of its time standing very still, looking thoughtful. They have strong opinions about tunnel placement but have yet to commit to any of them.`,
   },
   {
     name: 'The Efficient Minimalists',
     test: (_s) => true, // fallback
-    desc: (s) => `Clean tunnel network. Reliable food loops. ${s.foodCollected} food sources secured with surgical precision. Your colony is what the others aspire to be — and silently resent.`,
+    desc: (s, name) => `Clean tunnel network. Reliable food loops. ${s.foodCollected} food sources secured with surgical precision. ${name} is what the others aspire to be — and silently resent.`,
   },
 ];
 
 // Ant mode display config
 const MODE_COLORS = {
-  scout:  '#d49016', // amber — exploring, digging
-  toFood: '#50c8c8', // cyan — following pheromone trail to food
-  toNest: '#ffc84a', // bright amber — carrying food home
+  scout:  '#d49016',
+  toFood: '#50c8c8',
+  toNest: '#ffc84a',
 };
 
-const MODE_LABELS = {
-  scout:  'DIGGING',
-  toFood: 'SEEKING FOOD',
-  toNest: 'RETURNING HOME',
-};
+// ──────────────────────────────────────────────
+//  Creation screen logic
+// ──────────────────────────────────────────────
+function selectTrait(btn) {
+  document.querySelectorAll('.trait-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  colonyTrait = btn.dataset.trait;
+  updateLaunchBtn();
+}
+
+function updateLaunchBtn() {
+  const nameVal = (document.getElementById('colony-name-input') || {}).value || '';
+  const btn = document.getElementById('btn-launch');
+  if (btn) btn.disabled = !(nameVal.trim() && colonyTrait);
+}
+
+function launchColony() {
+  const nameInput = document.getElementById('colony-name-input');
+  colonyName = (nameInput ? nameInput.value.trim() : '') || 'THE COLONY';
+  if (!colonyTrait) return;
+
+  // Transition to sim screen
+  document.getElementById('creation-screen').style.display = 'none';
+  const sim = document.getElementById('sim-screen');
+  sim.style.display = '';
+
+  // Personalize the header
+  document.getElementById('colony-title').textContent = colonyName.toUpperCase();
+  document.getElementById('subtitle').textContent = traitSubtitle(colonyTrait);
+
+  // Init and start simulation
+  canvas = document.getElementById('antfarm');
+  canvas.width = COLS * CELL;
+  canvas.height = ROWS * CELL;
+  ctx = canvas.getContext('2d');
+
+  canvas.addEventListener('click', canvasClick);
+  canvas.addEventListener('touchstart', canvasClick, { passive: false });
+
+  initGrid();
+  initAnts();
+  animId = requestAnimationFrame(tick);
+}
+
+function traitSubtitle(trait) {
+  const map = {
+    hoarders:   'your colony hoards — tap to drop food & watch them swarm',
+    excavators: 'your colony digs — every tunnel is a monument',
+    scouts:     'your colony ranges far — redirect them with food drops',
+    engineers:  'your colony is methodical — watch the system emerge',
+  };
+  return map[trait] || 'tap the soil to drop food — the colony will respond';
+}
+
+function redesignColony() {
+  cancelAnimationFrame(animId);
+  document.getElementById('sim-screen').style.display = 'none';
+  document.getElementById('creation-screen').style.display = '';
+  // Reset pheromones toggle button
+  showPheromones = true;
+  const btn = document.getElementById('btn-pheromones');
+  if (btn) { btn.textContent = 'PHEROMONES: ON'; btn.classList.remove('dim'); }
+  closeReveal();
+}
 
 // ──────────────────────────────────────────────
 //  Grid helpers
@@ -103,6 +176,11 @@ function initGrid() {
 
   foodSources = [];
   stats = { tunnels: 0, food: 0 };
+  tickCount = 0;
+  tapHintHidden = false;
+  lastFoodDrop = -999;
+  const hint = document.getElementById('tap-hint');
+  if (hint) hint.classList.remove('hidden');
 }
 
 function initAnts() {
@@ -119,7 +197,7 @@ function createAnt(x, y) {
     x, y,
     dx: Math.random() < 0.5 ? 1 : -1,
     dy: 1,
-    mode: 'scout',   // 'scout' | 'toFood' | 'toNest'
+    mode: 'scout',
     carryFood: false,
     age: 0,
     scoutTimer: 0,
@@ -160,6 +238,7 @@ const DIRS = [
 ];
 
 function stepAnt(ant, rng) {
+  const p = TRAIT_PARAMS[colonyTrait] || TRAIT_PARAMS.engineers;
   ant.age++;
   ant.scoutTimer++;
 
@@ -183,18 +262,15 @@ function stepAnt(ant, rng) {
   if (cell === 'soil' && ant.mode !== 'toNest') {
     grid[idx(ant.x, ant.y)] = 'tunnel';
     stats.tunnels++;
-    if (ant.carryFood) {
-      pheromones[idx(ant.x, ant.y) * 2] = Math.min(255, pheromones[idx(ant.x, ant.y) * 2] + 40);
-    }
   }
 
-  // Deposit pheromones — stronger values so trails are visible
+  // Deposit pheromones
   if (inBounds(ant.x, ant.y)) {
     const pi = idx(ant.x, ant.y) * 2;
     if (ant.mode === 'toNest') {
-      pheromones[pi] = Math.min(255, pheromones[pi] + 35);     // to-nest (amber)
+      pheromones[pi] = Math.min(255, pheromones[pi] + 35);
     } else {
-      pheromones[pi + 1] = Math.min(255, pheromones[pi + 1] + 22); // to-food (cyan)
+      pheromones[pi + 1] = Math.min(255, pheromones[pi + 1] + 22);
     }
   }
 
@@ -220,10 +296,10 @@ function stepAnt(ant, rng) {
       if (ncell === 'food') weight += 500;
       if (ncell === 'tunnel') weight += 2;
     } else {
-      // Scout: prefer pheromones lightly, downward gravity to explore
+      // Scout: trait affects downward dig bias
       weight += pheromones[np + 1] * 0.02;
       if (ncell === 'tunnel') weight += 1.5;
-      if (ny > ant.y) weight += 2;
+      if (ny > ant.y) weight += p.digBias * 2;
       if (ncell === 'food') weight += 80;
     }
 
@@ -238,7 +314,6 @@ function stepAnt(ant, rng) {
     return;
   }
 
-  // Weighted random pick
   const total = candidates.reduce((s, c) => s + c.weight, 0);
   let pick = rng() * total;
   for (const c of candidates) {
@@ -250,11 +325,11 @@ function stepAnt(ant, rng) {
     }
   }
 
-  // Mode transitions
-  if (ant.mode === 'scout' && ant.scoutTimer > 40 && rng() < 0.02) {
+  // Mode transitions driven by trait parameters
+  if (ant.mode === 'scout' && ant.scoutTimer > p.scoutSwitchTimer && rng() < p.scoutSwitchChance) {
     ant.mode = 'toFood';
   }
-  if (ant.mode === 'toFood' && ant.scoutTimer > 120 && rng() < 0.015) {
+  if (ant.mode === 'toFood' && ant.scoutTimer > p.foodSwitchTimer && rng() < p.foodSwitchChance) {
     ant.mode = 'scout';
     ant.scoutTimer = 0;
   }
@@ -264,8 +339,9 @@ function stepAnt(ant, rng) {
 //  Pheromone decay
 // ──────────────────────────────────────────────
 function decayPheromones() {
+  const p = TRAIT_PARAMS[colonyTrait] || TRAIT_PARAMS.engineers;
   for (let i = 0; i < pheromones.length; i++) {
-    if (pheromones[i] > 0) pheromones[i] = Math.max(0, pheromones[i] - 0.22);
+    if (pheromones[i] > 0) pheromones[i] = Math.max(0, pheromones[i] - p.pheroDecay);
   }
 }
 
@@ -284,26 +360,22 @@ const COLORS = {
 function render() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  // Draw grid
   for (let y = 0; y < ROWS; y++) {
     for (let x = 0; x < COLS; x++) {
       const cell = grid[idx(x, y)];
       ctx.fillStyle = COLORS[cell] || '#000';
       ctx.fillRect(x * CELL, y * CELL, CELL, CELL);
 
-      // Draw pheromone overlay — much stronger alpha so trails are clearly visible
       if (showPheromones && (cell === 'tunnel' || cell === 'nest' || cell === 'soil')) {
         const pi = idx(x, y) * 2;
-        const toNest = pheromones[pi];      // amber trail — ants carrying food home
-        const toFood = pheromones[pi + 1];  // cyan trail — ants seeking food
+        const toNest = pheromones[pi];
+        const toFood = pheromones[pi + 1];
 
         if (toNest > 3) {
-          // Amber = "food was here, follow me home"
           ctx.fillStyle = `rgba(255,180,40,${Math.min(toNest / 180, 0.75)})`;
           ctx.fillRect(x * CELL, y * CELL, CELL, CELL);
         }
         if (toFood > 3) {
-          // Cyan = "nest is here, come this way"
           ctx.fillStyle = `rgba(80,200,200,${Math.min(toFood / 200, 0.5)})`;
           ctx.fillRect(x * CELL, y * CELL, CELL, CELL);
         }
@@ -311,7 +383,7 @@ function render() {
     }
   }
 
-  // Food drop ripple effect
+  // Food drop ripple
   const rippleAge = tickCount - lastFoodDrop;
   if (rippleAge < 30) {
     const alpha = 1 - rippleAge / 30;
@@ -325,7 +397,7 @@ function render() {
     ctx.stroke();
   }
 
-  // Draw food sources (pulsing)
+  // Food sources (pulsing)
   const pulse = 0.5 + 0.5 * Math.sin(tickCount * 0.08);
   for (const f of foodSources) {
     const px = f.x * CELL + CELL / 2;
@@ -340,7 +412,7 @@ function render() {
     ctx.fill();
   }
 
-  // Draw ants — color-coded by mode so you can read the colony state at a glance
+  // Ants — color-coded by mode
   for (const ant of ants) {
     const px = ant.x * CELL + CELL / 2;
     const py = ant.y * CELL + CELL / 2;
@@ -359,22 +431,18 @@ const antRng = seededRng(Date.now() & 0xffff);
 function tick() {
   tickCount++;
 
-  // Step ants
   for (const ant of ants) {
     stepAnt(ant, antRng);
   }
 
-  // Decay pheromones every 3 frames
   if (tickCount % 3 === 0) decayPheromones();
 
-  // Mark food source cells
   for (const f of foodSources) {
     if (inBounds(f.x, f.y) && grid[idx(f.x, f.y)] !== 'nest') {
       grid[idx(f.x, f.y)] = 'food';
     }
   }
 
-  // Update stats display and live legend
   updateStats();
   updateLegend();
   render();
@@ -389,7 +457,6 @@ function updateStats() {
 }
 
 function updateLegend() {
-  // Count ants by mode and display live in the legend
   const counts = { scout: 0, toFood: 0, toNest: 0 };
   for (const ant of ants) counts[ant.mode]++;
   const legendScout  = document.getElementById('legend-scout-count');
@@ -426,8 +493,7 @@ function canvasClick(e) {
     }
   }
 
-  // Blast a burst of to-food pheromone outward from the drop point so ants
-  // pick up the signal quickly — this makes food placement feel impactful
+  // Blast pheromone burst
   const blastRadius = 12;
   for (let dy = -blastRadius; dy <= blastRadius; dy++) {
     for (let dx = -blastRadius; dx <= blastRadius; dx++) {
@@ -440,20 +506,17 @@ function canvasClick(e) {
     }
   }
 
-  // Switch ALL ants to food-seeking mode immediately — user action should be decisive
+  // Switch all ants to food-seeking — user action should feel decisive
   for (const ant of ants) {
     ant.mode = 'toFood';
     ant.scoutTimer = 0;
   }
 
-  // Ripple effect
   lastFoodDrop = tickCount;
   lastFoodPos = { x: gx, y: gy };
 
-  // Show a brief status message
   showAction('FOOD DROPPED — COLONY REDIRECTED');
 
-  // Hide tap hint
   if (!tapHintHidden) {
     tapHintHidden = true;
     document.getElementById('tap-hint').classList.add('hidden');
@@ -506,7 +569,6 @@ function takeSnapshot() {
 
     const snapStats = { tunnelCount, tunnelRatio, foodCollected, foodRatio, scoutCount, scoutRatio };
 
-    // Deterministic verdict from colony hash
     const h = colonyHash();
     const shuffled = VERDICTS.slice().sort((a, b) => {
       const ha = Math.imul(h, a.name.length) | 0;
@@ -521,28 +583,15 @@ function takeSnapshot() {
 
     document.getElementById('reveal-computing').style.display = 'none';
     document.getElementById('verdict-name').textContent = verdict.name;
-    document.getElementById('verdict-desc').textContent = verdict.desc(snapStats);
+    document.getElementById('verdict-desc').textContent = verdict.desc(snapStats, colonyName);
     document.getElementById('reveal-result').style.display = 'block';
     document.getElementById('share').style.display = 'block';
   }, 1400);
 }
 
 function closeReveal() {
-  document.getElementById('reveal-panel').style.display = 'none';
-}
-
-// ──────────────────────────────────────────────
-//  Reset
-// ──────────────────────────────────────────────
-function resetColony() {
-  cancelAnimationFrame(animId);
-  initGrid();
-  initAnts();
-  tapHintHidden = false;
-  lastFoodDrop = -999;
-  document.getElementById('tap-hint').classList.remove('hidden');
-  closeReveal();
-  animId = requestAnimationFrame(tick);
+  const panel = document.getElementById('reveal-panel');
+  if (panel) panel.style.display = 'none';
 }
 
 // ──────────────────────────────────────────────
@@ -550,7 +599,7 @@ function resetColony() {
 // ──────────────────────────────────────────────
 function share() {
   const verdictName = document.getElementById('verdict-name').textContent;
-  const shareText = `My ant colony is: "${verdictName}" — watch yours excavate an underground world`;
+  const shareText = `${colonyName} is: "${verdictName}" — design your own ant colony and see what they become`;
   if (navigator.share) {
     navigator.share({ title: 'Antfarm Architect', text: shareText, url: location.href });
   } else {
@@ -560,18 +609,18 @@ function share() {
 }
 
 // ──────────────────────────────────────────────
-//  Init
+//  Init — wire up creation screen on load
 // ──────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
-  canvas = document.getElementById('antfarm');
-  canvas.width = COLS * CELL;
-  canvas.height = ROWS * CELL;
-  ctx = canvas.getContext('2d');
-
-  canvas.addEventListener('click', canvasClick);
-  canvas.addEventListener('touchstart', canvasClick, { passive: false });
-
-  initGrid();
-  initAnts();
-  animId = requestAnimationFrame(tick);
+  const nameInput = document.getElementById('colony-name-input');
+  if (nameInput) {
+    nameInput.addEventListener('input', updateLaunchBtn);
+    // Convert to uppercase as the user types for the terminal aesthetic
+    nameInput.addEventListener('input', () => {
+      const pos = nameInput.selectionStart;
+      nameInput.value = nameInput.value.toUpperCase();
+      nameInput.setSelectionRange(pos, pos);
+      updateLaunchBtn();
+    });
+  }
 });
